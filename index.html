@@ -1,0 +1,451 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Simulador CloudPages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: duas colunas (input | output com abas) no desktop; empilha no mobile.
+     Paineis de log usam pills de severidade para leitura rapida (padrao dashboard). */
+  :root{
+    --bg:#f3f4f1;
+    --surface:#ffffff;
+    --surface-2:#eceee9;
+    --border:#d8dbd3;
+    --fg:#1a1d18;
+    --fg-muted:#62685d;
+    --accent:#3450c4;
+    --accent-fg:#ffffff;
+    --critical:#c6373a;
+    --critical-bg:#fbe9e8;
+    --warning:#b4740f;
+    --warning-bg:#fbf0dd;
+    --ok:#1f8a53;
+    --ok-bg:#e6f5ec;
+    --info:#2f6fa8;
+    --info-bg:#e7f0f8;
+    --code-bg:#15181a;
+    --code-fg:#dfe3e0;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14161a;
+      --surface:#1c1f24;
+      --surface-2:#22262c;
+      --border:#30353c;
+      --fg:#e9ebe6;
+      --fg-muted:#9aa09a;
+      --accent:#7b93ff;
+      --accent-fg:#0d1021;
+      --critical:#ff8585;
+      --critical-bg:#3a1e1f;
+      --warning:#f0b84f;
+      --warning-bg:#3a2e14;
+      --ok:#6fd19c;
+      --ok-bg:#163424;
+      --info:#7fb8ec;
+      --info-bg:#182c3a;
+      --code-bg:#0c0e10;
+      --code-fg:#cfd4cf;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14161a;
+    --surface:#1c1f24;
+    --surface-2:#22262c;
+    --border:#30353c;
+    --fg:#e9ebe6;
+    --fg-muted:#9aa09a;
+    --accent:#7b93ff;
+    --accent-fg:#0d1021;
+    --critical:#ff8585;
+    --critical-bg:#3a1e1f;
+    --warning:#f0b84f;
+    --warning-bg:#3a2e14;
+    --ok:#6fd19c;
+    --ok-bg:#163424;
+    --info:#7fb8ec;
+    --info-bg:#182c3a;
+    --code-bg:#0c0e10;
+    --code-fg:#cfd4cf;
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'Manrope',system-ui,sans-serif;
+    display:flex;
+    flex-direction:column;
+  }
+  .app{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-height:100%;
+  }
+
+  .topbar{
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .topbar-inner{
+    padding-block:18px;
+    padding-left:max(20px, env(safe-area-inset-left, 0px));
+    padding-right:max(20px, env(safe-area-inset-right, 0px));
+    display:flex;
+    align-items:center;
+    gap:14px;
+    max-width:1280px;
+    margin:0 auto;
+  }
+  .brand-mark{
+    width:38px;height:38px;flex:none;
+    border-radius:9px;
+    background:var(--accent);
+    color:var(--accent-fg);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:15px;
+  }
+  .topbar h1{
+    margin:0;
+    font-size:17px;
+    font-weight:800;
+    letter-spacing:-0.01em;
+  }
+  .topbar p{
+    margin:2px 0 0;
+    font-size:13px;
+    color:var(--fg-muted);
+  }
+
+  .layout{
+    position:relative;
+    flex:1;
+    display:flex;
+    gap:1px;
+    background:var(--border);
+    width:100%;
+    margin:0 auto;
+  }
+  @media (max-width: 860px){
+    .layout{flex-direction:column;}
+    .layout .pane-input{flex-basis:auto!important;width:auto!important;opacity:1!important;}
+  }
+
+  .pane{
+    background:var(--surface);
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
+  .pane-input{
+    flex:0 0 420px;
+    width:420px;
+    min-height:420px;
+    overflow:hidden;
+    transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
+  }
+  .layout.input-collapsed .pane-input{
+    flex:0 0 0;
+    width:0;
+    opacity:0;
+    pointer-events:none;
+  }
+  .pane-output{flex:1 1 auto; min-height:560px;}
+
+  .expand-rail{
+    display:none;
+    top:14px;
+    left:max(10px, env(safe-area-inset-left,0px));
+    z-index:5;
+    width:30px;
+    height:30px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--surface);
+    color:var(--fg-muted);
+    font-size:14px;
+    cursor:pointer;
+    align-items:center;
+    justify-content:center;
+  }
+  .layout.input-collapsed .expand-rail{display:flex;}
+  .expand-rail:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .pane-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:14px max(16px, env(safe-area-inset-left,0px)) 10px max(16px, env(safe-area-inset-left,0px));
+  }
+  .pane-head h2{
+    margin:0;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--fg-muted);
+  }
+
+  textarea#codeInput{
+    flex:1;
+    margin:0 max(16px, env(safe-area-inset-left,0px)) 0 max(16px, env(safe-area-inset-left,0px));
+    padding:14px;
+    resize:none;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--code-bg);
+    color:var(--code-fg);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    line-height:1.55;
+    min-height:260px;
+  }
+  textarea#codeInput:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+
+  .pane-foot{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px max(16px, env(safe-area-inset-left,0px)) max(16px, env(safe-area-inset-bottom,0px)) max(16px, env(safe-area-inset-left,0px));
+  }
+  .hint{font-size:12px;color:var(--fg-muted);}
+
+  .btn{
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--fg);
+    font-family:inherit;
+    font-weight:600;
+    font-size:13px;
+    padding:9px 14px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .btn-ghost{background:transparent;}
+  .btn-primary{
+    background:var(--accent);
+    color:var(--accent-fg);
+    border-color:var(--accent);
+  }
+
+  .tabs{
+    display:flex;
+    gap:2px;
+    padding:10px max(16px, env(safe-area-inset-left,0px)) 0 max(16px, env(safe-area-inset-left,0px));
+    border-bottom:1px solid var(--border);
+  }
+  .tab{
+    border:none;
+    background:transparent;
+    color:var(--fg-muted);
+    font-family:inherit;
+    font-weight:700;
+    font-size:13px;
+    padding:10px 14px;
+    border-radius:8px 8px 0 0;
+    cursor:pointer;
+    display:flex;align-items:center;gap:6px;
+  }
+  .tab.active{
+    color:var(--fg);
+    background:var(--surface-2);
+  }
+  .tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .badge{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    background:var(--critical);
+    color:#fff;
+    border-radius:999px;
+    padding:1px 7px;
+  }
+
+  .tab-panel{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+
+  .preview-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px max(16px, env(safe-area-inset-left,0px));
+  }
+  .preview-label{font-size:12px;color:var(--fg-muted);}
+  .viewport-switch{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .vbtn{
+    border:none;
+    background:var(--surface);
+    color:var(--fg-muted);
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    padding:7px 12px;
+    cursor:pointer;
+  }
+  .vbtn.active{background:var(--accent);color:var(--accent-fg);}
+
+  .iframe-wrap{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    padding:0 max(16px, env(safe-area-inset-left,0px)) max(16px, env(safe-area-inset-bottom,0px));
+    min-height:0;
+    overflow-x:auto;
+  }
+  #previewFrame{
+    width:1440px;
+    min-width:1440px;
+    height:100%;
+    min-height:420px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:#fff;
+  }
+  #previewFrame.mobile{width:390px; min-width:390px;}
+  .preview-scale-hint{font-size:11px; color:var(--fg-muted);}
+
+  #panel-log{
+    padding:0 max(16px, env(safe-area-inset-left,0px)) max(16px, env(safe-area-inset-bottom,0px));
+    overflow:auto;
+  }
+  .log-summary{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    padding:14px 0 6px;
+  }
+  .pill{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .pill-critical{background:var(--critical-bg);color:var(--critical);}
+  .pill-warning{background:var(--warning-bg);color:var(--warning);}
+  .pill-ok{background:var(--ok-bg);color:var(--ok);}
+  .pill-info{background:var(--info-bg);color:var(--info);}
+
+  .log-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .log-item{
+    border:1px solid var(--border);
+    border-left:4px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    background:var(--surface-2);
+    display:flex;
+    gap:10px;
+  }
+  .log-item.level-critical{border-left-color:var(--critical);}
+  .log-item.level-warning{border-left-color:var(--warning);}
+  .log-item.level-ok{border-left-color:var(--ok);}
+  .log-item.level-info{border-left-color:var(--info);}
+  .log-dot{
+    flex:none;
+    width:8px;height:8px;border-radius:999px;margin-top:6px;
+  }
+  .level-critical .log-dot{background:var(--critical);}
+  .level-warning .log-dot{background:var(--warning);}
+  .level-ok .log-dot{background:var(--ok);}
+  .level-info .log-dot{background:var(--info);}
+  .log-item h3{
+    margin:0 0 3px;
+    font-size:13px;
+    font-weight:700;
+  }
+  .log-item p{
+    margin:0;
+    font-size:12.5px;
+    color:var(--fg-muted);
+    line-height:1.45;
+  }
+  .log-item code{
+    font-family:'JetBrains Mono',monospace;
+    background:var(--code-bg);
+    color:var(--code-fg);
+    padding:1px 5px;
+    border-radius:4px;
+    font-size:11.5px;
+  }
+
+  [hidden]{display:none!important;}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand-mark">CSB</span>
+      <div>
+        <h1>CloudSandbox</h1>
+        <p>Veja como a sua LP fica depois do deploy no CloudPages (Salesforce Marketing Cloud)!</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout" id="layoutRoot">
+    <button id="expandInputBtn" class="expand-rail" type="button" aria-label="Mostrar box de código" title="Mostrar box de código">&rsaquo;</button>
+    <section class="pane pane-input">
+      <div class="pane-head">
+        <h2>Código da LP</h2>
+        <div style="display:flex; gap:8px;">
+          <button id="loadExample" class="btn btn-ghost">Carregar exemplo</button>
+          <button id="collapseInputBtn" class="btn btn-ghost" type="button" aria-label="Ocultar box de código" title="Ocultar box de código">&lsaquo;</button>
+        </div>
+      </div>
+      <textarea id="codeInput" spellcheck="false" placeholder="Cole aqui o HTML completo da sua LP, do <!DOCTYPE> até o </html>..."></textarea>
+      <div class="pane-foot">
+        <button id="analyzeBtn" class="btn btn-primary">Analisar</button>
+        <span id="charCount" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="pane pane-output">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="preview" role="tab" aria-selected="true">Preview simulado</button>
+        <button class="tab" data-tab="log" role="tab" aria-selected="false">Log de validação <span id="logBadge" class="badge" hidden>0</span></button>
+      </div>
+
+      <div class="tab-panel" id="panel-preview">
+        <div class="preview-toolbar">
+          <span class="preview-label">Resultado estimado após o deploy no CloudPages</span>
+          <div class="viewport-switch">
+            <button class="vbtn active" data-width="desktop">Desktop</button>
+            <button class="vbtn" data-width="mobile">Mobile</button>
+          </div>
+        </div>
+        <div class="iframe-wrap">
+          <iframe id="previewFrame" sandbox="allow-scripts allow-forms" title="Preview simulado pós-deploy"></iframe>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-log" hidden>
+        <div class="log-summary" id="logSummary"></div>
+        <ul class="log-list" id="logList"></ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="script/simulador-cloudpages.js"></script>
