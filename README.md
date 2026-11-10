@@ -111,7 +111,8 @@ O exemplo é uma LP de inscrição (“Oficina de Vinhos”) feita para disparar
 - Estilos e scripts que já estão no `<body>` são mantidos como estão. A ferramenta não reescreve CSS nem remove atributos.
 - O iframe sandboxed não é a página publicada: cookies, domínio, formulários reais e recursos que dependem do CloudPages não existem aqui.
 
-## Arquivos
+## Acesse o projeto em deploy diretamente no link abaixo:
+https://kakalpdev.github.io/cloudsandbox/
 
 | Arquivo                          | Função                                                   |
 | -------------------------------- | -------------------------------------------------------- |
